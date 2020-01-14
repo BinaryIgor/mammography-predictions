@@ -26,10 +26,27 @@ def test_model(model, name):
                   xgbclassifier__verbose=False)
     else:
         model.fit(X_train, y_train)
+    train_predictions = model.predict(X_train)
     predictions = model.predict(X_valid)
     accuracy = accuracy_score(y_valid, predictions)
     print(f'{name} performance: {accuracy}')
-    return predictions
+    return train_predictions, predictions
+
+
+def test_stacked_model(all_predictions, model):
+    train_X = {}
+    test_X = {}
+
+    for i, p in enumerate(all_predictions):
+        train_X[i] = p[0]
+        test_X[i] = p[1]
+
+    train_X = pd.DataFrame(train_X)
+    test_X = pd.DataFrame(test_X)
+
+    model.fit(train_X, y_train)
+    stacked_accuracy = accuracy_score(y_valid, model.predict(test_X))
+    print(f'Stacked model accuracy: {stacked_accuracy}')
 
 
 def voting_prediction(predictions):
@@ -55,7 +72,6 @@ GRADIENT_BOOSTING = 'Gradient Boosting'
 X = pd.read_csv('mammographic_masses.data.txt',
                 na_values=['?'], names=ALL_FEATURES)
 X.dropna(axis=0, subset=[TARGET_FEATURE])
-X['shape_density'] = X['shape'] * X['density']
 print('Correlations:')
 print(X.corr())
 print()
@@ -64,7 +80,7 @@ y = X[TARGET_FEATURE]
 X.drop([TARGET_FEATURE], inplace=True, axis=1)
 
 print('Selected features:')
-SELECTED_FEATURES = ['BI-RADS','shape', 'margin', 'density']
+SELECTED_FEATURES = ['BI-RADS', 'shape', 'margin', 'density']
 print(SELECTED_FEATURES)
 X = X[SELECTED_FEATURES]
 print()
@@ -92,10 +108,16 @@ model = create_pipeline(XGBClassifier(n_estimators=GRADIENT_BOOSTING_ESTIMATORS,
                                       learning_rate=GRADIENT_BOOSTING_LEARNING_RATE))
 gradient_boosting_predictions = test_model(model, GRADIENT_BOOSTING)
 
-predictions = [random_forest_predictions, svc_predictions, logistic_regression_predictions,
-               gradient_boosting_predictions]
-voted_predictions = voting_prediction(predictions)
+all_predictions = [random_forest_predictions, svc_predictions, logistic_regression_predictions,
+                   gradient_boosting_predictions]
+test_predictions = [p[1] for p in all_predictions]
+models_collection = "Random Forest, SVC, Logistic Regression, Gradient Boosting"
+
+voted_predictions = voting_prediction(test_predictions)
 accuracy = accuracy_score(y_valid, voted_predictions)
 print()
-print(f'Voted(Random Forest, Svc, Logistic Regression, Gradient Boosting) accuracy')
+print(f'Voted({models_collection}) accuracy')
 print(accuracy)
+
+print(f'Stacked({models_collection}) with Random Forest meta model accuracy')
+test_stacked_model(all_predictions, RandomForestClassifier(n_estimators=20))
