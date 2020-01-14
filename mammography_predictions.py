@@ -70,7 +70,7 @@ X = X[SELECTED_FEATURES]
 print()
 
 X_train, X_valid, y_train, y_valid = train_test_split(X.values, y, train_size=0.75)
-model = create_pipeline(DummyClassifier())
+model = create_pipeline(DummyClassifier(strategy='most_frequent'))
 test_model(model, 'Baseline')
 
 model = create_pipeline(RandomForestClassifier(n_estimators=RANDOM_FOREST_ESTIMATORS))
